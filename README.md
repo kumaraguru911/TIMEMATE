@@ -56,17 +56,6 @@ This app uses `flutter_launcher_icons` for a custom app icon. To regenerate icon
 flutter pub run flutter_launcher_icons:main
 ```
 
-## Screenshots
-
-Here are some screenshots of the app:
-
-<img src="assets/addpage.jpg" alt="add table" width="400"/>
-
-![Add Class Page](assets/addpage.jpg)
-
-![Front Page](assets/front.jpg)
-
-![Home Page](assets/home.jpg)
 
 -------------------------------------------------------------------------
 
