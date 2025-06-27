@@ -1,5 +1,5 @@
 # TIMEMATE
-=======
+=========================================
 # TimeMate - College Timetable App
 
 A beautiful Flutter app to plan and organize college timetables, featuring multiple class inputs, grouping by day, animations, persistent storage, and more.
@@ -60,13 +60,15 @@ flutter pub run flutter_launcher_icons:main
 
 Here are some screenshots of the app:
 
+<img src="assets/addpage.jpg" alt="add table" width="400"/>
+
 ![Add Class Page](assets/addpage.jpg)
 
 ![Front Page](assets/front.jpg)
 
 ![Home Page](assets/home.jpg)
 
----
+-------------------------------------------------------------------------
 
 For more information, see the [Flutter documentation](https://docs.flutter.dev/).
->>>>>>> e627169 (Initial commit: TimeMate app with enhanced UI and features)
+e627169 (Initial commit: TimeMate app with enhanced UI and features)
