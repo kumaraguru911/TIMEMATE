@@ -7,13 +7,33 @@ class AddClassPage extends StatefulWidget {
   State<AddClassPage> createState() => _AddClassPageState();
 }
 
+class _ClassRowControllers {
+  final subjectController = TextEditingController();
+  final startTimeController = TextEditingController();
+  final endTimeController = TextEditingController();
+
+  void dispose() {
+    subjectController.dispose();
+    startTimeController.dispose();
+    endTimeController.dispose();
+  }
+}
+
 class _AddClassPageState extends State<AddClassPage> {
   final _formKey = GlobalKey<FormState>();
 
   String _selectedDay = 'Monday';
-  final List<Map<String, String>> _classRows = [
-    {'subject': '', 'startTime': '', 'endTime': ''},
+  final List<_ClassRowControllers> _controllers = [
+    _ClassRowControllers(),
   ];
+
+  @override
+  void dispose() {
+    for (var c in _controllers) {
+      c.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,9 +61,9 @@ class _AddClassPageState extends State<AddClassPage> {
                 decoration: const InputDecoration(labelText: 'Day'),
               ),
               const SizedBox(height: 16),
-              ..._classRows.asMap().entries.map((entry) {
+              ..._controllers.asMap().entries.map((entry) {
                 final index = entry.key;
-                final classData = entry.value;
+                final c = entry.value;
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   child: Padding(
@@ -51,25 +71,25 @@ class _AddClassPageState extends State<AddClassPage> {
                     child: Column(
                       children: [
                         TextFormField(
-                          decoration: InputDecoration(labelText: 'Subject ${index + 1}'),
+                          controller: c.subjectController,
+                          decoration: InputDecoration(labelText: 'Subject ${index + 1}'),
                           validator: (value) => value!.isEmpty ? 'Enter subject' : null,
-                          onSaved: (value) => classData['subject'] = value!,
                         ),
                         Row(
                           children: [
                             Expanded(
                               child: TextFormField(
+                                controller: c.startTimeController,
                                 decoration: const InputDecoration(labelText: 'Start Time'),
                                 validator: (value) => value!.isEmpty ? 'Enter start time' : null,
-                                onSaved: (value) => classData['startTime'] = value!,
                               ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
                               child: TextFormField(
+                                controller: c.endTimeController,
                                 decoration: const InputDecoration(labelText: 'End Time'),
                                 validator: (value) => value!.isEmpty ? 'Enter end time' : null,
-                                onSaved: (value) => classData['endTime'] = value!,
                               ),
                             ),
                           ],
@@ -79,7 +99,9 @@ class _AddClassPageState extends State<AddClassPage> {
                           child: IconButton(
                             icon: const Icon(Icons.delete, color: Colors.red),
                             onPressed: () {
-                              setState(() => _classRows.removeAt(index));
+                              setState(() {
+                                _controllers.removeAt(index).dispose();
+                              });
                             },
                           ),
                         ),
@@ -93,7 +115,7 @@ class _AddClassPageState extends State<AddClassPage> {
                 label: const Text('Add Another Class'),
                 onPressed: () {
                   setState(() {
-                    _classRows.add({'subject': '', 'startTime': '', 'endTime': ''});
+                    _controllers.add(_ClassRowControllers());
                   });
                 },
               ),
@@ -101,12 +123,11 @@ class _AddClassPageState extends State<AddClassPage> {
               ElevatedButton(
                 onPressed: () {
                   if (_formKey.currentState!.validate()) {
-                    _formKey.currentState!.save();
-                    final result = _classRows.map((row) => {
+                    final result = _controllers.map((c) => {
                           'day': _selectedDay,
-                          'subject': row['subject'],
-                          'startTime': row['startTime'],
-                          'endTime': row['endTime'],
+                          'subject': c.subjectController.text,
+                          'startTime': c.startTimeController.text,
+                          'endTime': c.endTimeController.text,
                         }).toList();
                     Navigator.pop(context, result);
                   }
