@@ -3,8 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
-import 'package:animations/animations.dart';
-import 'package:lottie/lottie.dart';
 import 'add_class_page.dart';
 import 'splash_screen.dart';
 
@@ -131,7 +129,7 @@ class _HomePageState extends State<HomePage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Lottie.asset('assets/timemate.png', width: 120, height: 120, repeat: true),
+                  Image.asset('assets/timemate.png', width: 120, height: 120),
                   const SizedBox(height: 16),
                   const Text('No classes added yet. Tap + to add!'),
                 ],
@@ -170,51 +168,16 @@ class _HomePageState extends State<HomePage> {
                             child: SlideAnimation(
                               verticalOffset: 50.0,
                               child: FadeInAnimation(
-                                child: OpenContainer(
-                                  closedElevation: 0,
-                                  openElevation: 4,
-                                  closedColor: _subjectColor(e.value.subject),
-                                  openColor: Colors.white,
-                                  transitionType: ContainerTransitionType.fadeThrough,
-                                  transitionDuration: const Duration(milliseconds: 600),
-                                  closedBuilder: (context, action) => Card(
-                                    color: _subjectColor(e.value.subject),
-                                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                                    child: ListTile(
-                                      leading: const Icon(Icons.class_),
-                                      title: Text(
-                                        e.value.subject,
-                                        style: const TextStyle(fontWeight: FontWeight.bold),
-                                      ),
-                                      subtitle: Text('${e.value.startTime} - ${e.value.endTime}'),
+                                child: Card(
+                                  color: _subjectColor(e.value.subject),
+                                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                  child: ListTile(
+                                    leading: const Icon(Icons.class_),
+                                    title: Text(
+                                      e.value.subject,
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
                                     ),
-                                  ),
-                                  openBuilder: (context, action) => Scaffold(
-                                    appBar: AppBar(
-                                      title: Text(e.value.subject),
-                                      backgroundColor: _subjectColor(e.value.subject),
-                                    ),
-                                    body: Center(
-                                      child: Card(
-                                        elevation: 8,
-                                        margin: const EdgeInsets.all(32),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(24),
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Text(
-                                                e.value.subject,
-                                                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-                                              ),
-                                              const SizedBox(height: 16),
-                                              Text('Day: ${e.value.day}'),
-                                              Text('Time: ${e.value.startTime} - ${e.value.endTime}'),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
+                                    subtitle: Text('${e.value.startTime} - ${e.value.endTime}'),
                                   ),
                                 ),
                               ),
@@ -225,20 +188,31 @@ class _HomePageState extends State<HomePage> {
                 }).toList(),
               ),
             ),
-      floatingActionButton: OpenContainer(
-        transitionType: ContainerTransitionType.fade,
-        transitionDuration: const Duration(milliseconds: 600),
-        closedElevation: 6,
-        closedShape: const CircleBorder(),
-        closedColor: Colors.indigo,
-        openColor: Colors.white,
-        closedBuilder: (context, action) => FloatingActionButton(
-          onPressed: action,
-          backgroundColor: Colors.indigo,
-          child: const Icon(Icons.add),
-        ),
-        openBuilder: (context, action) => const AddClassPage(),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AddClassPage()),
+          );
+          if (result != null && result is List) {
+            setState(() {
+              for (final classMap in result) {
+                _classItems.add(ClassItem(
+                  day: classMap['day'],
+                  subject: classMap['subject'],
+                  startTime: classMap['startTime'],
+                  endTime: classMap['endTime'],
+                ));
+              }
+            });
+            await _saveClasses();
+          }
+        },
+        backgroundColor: Colors.indigo,
+        child: const Icon(Icons.add),
       ),
     );
   }
 }
+// This code is the main entry point for a Flutter application that displays a college timetable.
+// It includes a splash screen, a home page with a list of classes grouped by day,

@@ -21,7 +21,6 @@ class _ClassRowControllers {
 
 class _AddClassPageState extends State<AddClassPage> {
   final _formKey = GlobalKey<FormState>();
-
   String _selectedDay = 'Monday';
   final List<_ClassRowControllers> _controllers = [
     _ClassRowControllers(),
@@ -72,7 +71,7 @@ class _AddClassPageState extends State<AddClassPage> {
                       children: [
                         TextFormField(
                           controller: c.subjectController,
-                          decoration: InputDecoration(labelText: 'Subject ${index + 1}'),
+                          decoration: InputDecoration(labelText: 'Subject ${index + 1}'),
                           validator: (value) => value!.isEmpty ? 'Enter subject' : null,
                         ),
                         Row(
@@ -129,7 +128,7 @@ class _AddClassPageState extends State<AddClassPage> {
                           'startTime': c.startTimeController.text,
                           'endTime': c.endTimeController.text,
                         }).toList();
-                    Navigator.pop(context, result);
+                    Navigator.of(context).pop(result); // ✅ Correctly return data
                   }
                 },
                 child: const Text('Save Schedule'),
