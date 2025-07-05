@@ -22,9 +22,7 @@ class _ClassRowControllers {
 class _AddClassPageState extends State<AddClassPage> {
   final _formKey = GlobalKey<FormState>();
   String _selectedDay = 'Monday';
-  final List<_ClassRowControllers> _controllers = [
-    _ClassRowControllers(),
-  ];
+  final List<_ClassRowControllers> _controllers = [_ClassRowControllers()];
 
   @override
   void dispose() {
@@ -37,9 +35,7 @@ class _AddClassPageState extends State<AddClassPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Add Day\'s Schedule'),
-      ),
+      appBar: AppBar(title: const Text('Add Day\'s Schedule')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -51,7 +47,10 @@ class _AddClassPageState extends State<AddClassPage> {
                 items: const [
                   DropdownMenuItem(value: 'Monday', child: Text('Monday')),
                   DropdownMenuItem(value: 'Tuesday', child: Text('Tuesday')),
-                  DropdownMenuItem(value: 'Wednesday', child: Text('Wednesday')),
+                  DropdownMenuItem(
+                    value: 'Wednesday',
+                    child: Text('Wednesday'),
+                  ),
                   DropdownMenuItem(value: 'Thursday', child: Text('Thursday')),
                   DropdownMenuItem(value: 'Friday', child: Text('Friday')),
                   DropdownMenuItem(value: 'Saturday', child: Text('Saturday')),
@@ -71,24 +70,40 @@ class _AddClassPageState extends State<AddClassPage> {
                       children: [
                         TextFormField(
                           controller: c.subjectController,
-                          decoration: InputDecoration(labelText: 'Subject ${index + 1}'),
-                          validator: (value) => value!.isEmpty ? 'Enter subject' : null,
+                          decoration: InputDecoration(
+                            labelText: 'Subject ${index + 1}',
+                          ),
+                          validator:
+                              (value) =>
+                                  value!.isEmpty ? 'Enter subject' : null,
                         ),
                         Row(
                           children: [
                             Expanded(
                               child: TextFormField(
                                 controller: c.startTimeController,
-                                decoration: const InputDecoration(labelText: 'Start Time'),
-                                validator: (value) => value!.isEmpty ? 'Enter start time' : null,
+                                decoration: const InputDecoration(
+                                  labelText: 'Start Time',
+                                ),
+                                validator:
+                                    (value) =>
+                                        value!.isEmpty
+                                            ? 'Enter start time'
+                                            : null,
                               ),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
                               child: TextFormField(
                                 controller: c.endTimeController,
-                                decoration: const InputDecoration(labelText: 'End Time'),
-                                validator: (value) => value!.isEmpty ? 'Enter end time' : null,
+                                decoration: const InputDecoration(
+                                  labelText: 'End Time',
+                                ),
+                                validator:
+                                    (value) =>
+                                        value!.isEmpty
+                                            ? 'Enter end time'
+                                            : null,
                               ),
                             ),
                           ],
@@ -122,13 +137,20 @@ class _AddClassPageState extends State<AddClassPage> {
               ElevatedButton(
                 onPressed: () {
                   if (_formKey.currentState!.validate()) {
-                    final result = _controllers.map((c) => {
-                          'day': _selectedDay,
-                          'subject': c.subjectController.text,
-                          'startTime': c.startTimeController.text,
-                          'endTime': c.endTimeController.text,
-                        }).toList();
-                    Navigator.of(context).pop(result); // ✅ Correctly return data
+                    final result =
+                        _controllers
+                            .map(
+                              (c) => {
+                                'day': _selectedDay,
+                                'subject': c.subjectController.text,
+                                'startTime': c.startTimeController.text,
+                                'endTime': c.endTimeController.text,
+                              },
+                            )
+                            .toList();
+                    Navigator.of(
+                      context,
+                    ).pop(result); // ✅ Correctly return data
                   }
                 },
                 child: const Text('Save Schedule'),
