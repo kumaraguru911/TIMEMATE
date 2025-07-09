@@ -13,6 +13,9 @@ import 'screens/profile_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/timetable_edit_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/forget_password_screen.dart';
+import 'screens/create_class_screen.dart';
+
 // DO NOT import manual_extra_classes_screen.dart here for static routing
 // Because it needs a runtime year argument
 
@@ -37,10 +40,12 @@ class TimemateApp extends StatelessWidget {
         '/login': (_) => const LoginScreen(),
         '/register': (_) => const RegisterScreen(),
         '/year-selection': (_) => const YearSelectionScreen(),
-        '/profile': (_) => const ProfileScreen(),
+        '/profile': (context) => const ProfileScreen(),
         '/settings': (_) => const SettingsScreen(),
-        '/dashboard': (_) => const DashboardScreen(),
+        '/dashboard': (_) => DashboardScreen(),
         '/edit-timetable': (_) => const TimetableEditScreen(),
+        '/forgot-password': (context) => const ForgetPasswordScreen(),
+        '/create_class_screen': (context) => const CreateClassScreen(),
         // Removed '/manual-extra-classes' route because ManualExtraClassesScreen needs runtime argument 'year'
         // Also removed '/timetable' for same reason (requires year).
       },
