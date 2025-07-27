@@ -21,7 +21,7 @@ A beautiful Flutter app to plan and organize college timetables, featuring multi
 
 ### 1. Clone the repository
 ```
-git clone <your-repo-url>
+git clone https://github.com/kumaraguru911/TIMEMATE
 cd class_timetable_app/class_timetable_app
 ```
 
