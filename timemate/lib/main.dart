@@ -15,6 +15,10 @@ import 'screens/timetable_edit_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/forget_password_screen.dart';
 import 'screens/create_class_screen.dart';
+import 'screens/staff_database_screen.dart';
+import 'screens/verify_subjects_screen.dart';
+import 'screens/generate_timetable_screen.dart';
+
 
 // DO NOT import manual_extra_classes_screen.dart here for static routing
 // Because it needs a runtime year argument

@@ -114,7 +114,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ListTile(
                     leading: const Icon(Icons.info, color: Colors.white),
                     title: const Text("App Version", style: TextStyle(color: Colors.white)),
-                    subtitle: const Text("v1.0.0 (Beta)", style: TextStyle(color: Colors.white70)),
+                    subtitle: const Text("v1.0.0+1", style: TextStyle(color: Colors.white70)),
                   ),
                   ListTile(
   leading: const Icon(Icons.feedback, color: Colors.cyanAccent),

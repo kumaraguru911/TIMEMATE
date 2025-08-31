@@ -4,6 +4,7 @@ import 'package:lottie/lottie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'create_class_screen.dart';
+import 'staff_database_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -204,7 +205,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 24),
 
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                      const Text("Staff Database", style: TextStyle(fontSize: 24, color: Colors.white70)),
+                      ElevatedButton(
+                      onPressed: () {
+                      Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const StaffDatabaseScreen()),
+                      );
+                      },
+                      child: const Text("Open"),
+                      ),
+                      ],
+                      ),
                     const SizedBox(height: 24),
                     const Align(
                       alignment: Alignment.centerLeft,
