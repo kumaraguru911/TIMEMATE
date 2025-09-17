@@ -130,7 +130,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         context: context,
                         builder: (_) => AlertDialog(
                           title: const Text("About Us"),
-                          content: const Text("TimeMate is developed by Ragu and team to help organize class schedules."),
+                          content: const Text("TimeMate is developed by Kumaraguru to help organize class schedules."),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(context),
