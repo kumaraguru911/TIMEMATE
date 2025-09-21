@@ -51,15 +51,6 @@ Or press **F5** in VS Code.
 
 ---
 
-## 📱 Screenshots
-
-<p align="center">
-  <img src="docs/dashboard.png" width="300" />
-  <img src="docs/calendar.png" width="300" />
-</p>
-
----
-
 ## 🤝 Contributing
 
 Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
