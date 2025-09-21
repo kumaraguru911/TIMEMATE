@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "500526419250",
+    "project_id": "timemate-5ed32",
+    "storage_bucket": "timemate-5ed32.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:500526419250:android:acbe24f6545a13b0995b2b",
+        "android_client_info": {
+          "package_name": "com.example.class_timetable_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDcLOVBtoake0h7DJxksspM_Uz_2mNN464"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

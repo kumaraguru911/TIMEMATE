@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,6 +18,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
   String? _emailError;
   String? _passwordError;
+  bool _isLoading = false;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   void initState() {
@@ -37,14 +40,43 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     super.dispose();
   }
 
-  void _handleLogin() {
+  // ---------------- Handle Firebase Login ----------------
+  Future<void> _handleLogin() async {
     setState(() {
       _emailError = _emailController.text.trim().isEmpty ? "Please enter your email" : null;
       _passwordError = _passwordController.text.isEmpty ? "Please enter your password" : null;
     });
 
     if (_emailError == null && _passwordError == null) {
-      Navigator.pushReplacementNamed(context, '/dashboard');
+      try {
+        setState(() => _isLoading = true);
+
+        await _auth.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
+
+        // Navigate to dashboard after successful login
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/dashboard');
+        }
+      } on FirebaseAuthException catch (e) {
+        String errorMessage = "Login failed. Please try again.";
+        if (e.code == 'user-not-found') {
+          errorMessage = "No user found for this email.";
+        } else if (e.code == 'wrong-password') {
+          errorMessage = "Incorrect password.";
+        } else if (e.code == 'invalid-email') {
+          errorMessage = "Invalid email address.";
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorMessage)),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -80,7 +112,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     children: [
                       // Bigger animated Lottie
                       SizedBox(
-                        height: 300, // increased size
+                        height: 300,
                         child: Lottie.asset(
                           'assets/animations/login.json',
                           fit: BoxFit.contain,
@@ -128,13 +160,15 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24.0),
                         child: ElevatedButton(
-                          onPressed: _handleLogin,
+                          onPressed: _isLoading ? null : _handleLogin,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.white,
                             minimumSize: const Size(double.infinity, 50),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                           ),
-                          child: const Text("Login", style: TextStyle(color: Colors.black, fontSize: 18)),
+                          child: _isLoading
+                              ? const CircularProgressIndicator(color: Colors.black)
+                              : const Text("Login", style: TextStyle(color: Colors.black, fontSize: 18)),
                         ),
                       ),
                       const SizedBox(height: 20),

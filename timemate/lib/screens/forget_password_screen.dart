@@ -1,8 +1,7 @@
-import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ForgetPasswordScreen extends StatefulWidget {
   const ForgetPasswordScreen({super.key});
@@ -13,18 +12,11 @@ class ForgetPasswordScreen extends StatefulWidget {
 
 class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> with SingleTickerProviderStateMixin {
   final _emailController = TextEditingController();
-  final _otpController = TextEditingController();
-  final _newPasswordController = TextEditingController();
-
   late AnimationController _animationController;
   late Animation<double> _animation;
-
-  String? _generatedOtp;
-  Timer? _otpTimer;
-  bool _otpSent = false;
-  bool _otpVerified = false;
+  bool _isLoading = false;
   String? _errorMessage;
-  int _otpCountdown = 60;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   void initState() {
@@ -39,69 +31,39 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> with Single
 
   @override
   void dispose() {
-    _animationController.dispose();
-    _emailController.dispose();
-    _otpController.dispose();
-    _newPasswordController.dispose();
-    _otpTimer?.cancel();
-    super.dispose();
+  _animationController.dispose();
+  _emailController.dispose();
+  super.dispose();
   }
 
-  void _sendOtp() {
+  Future<void> _sendPasswordResetEmail() async {
     final email = _emailController.text.trim();
-
     if (email.isEmpty || !email.contains('@')) {
       setState(() => _errorMessage = "Please enter a valid email.");
       return;
     }
-
     setState(() {
+      _isLoading = true;
       _errorMessage = null;
-      _generatedOtp = (100000 + Random().nextInt(900000)).toString();
-      _otpSent = true;
-      _otpVerified = false;
-      _otpCountdown = 60;
     });
-
-    _otpTimer?.cancel();
-    _otpTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        if (_otpCountdown > 0) {
-          _otpCountdown--;
-        } else {
-          _generatedOtp = null;
-          _otpSent = false;
-          timer.cancel();
-        }
-      });
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("OTP sent to $email: $_generatedOtp")),
-    );
-  }
-
-  void _verifyOtpAndChangePassword() {
-    final enteredOtp = _otpController.text.trim();
-    final newPassword = _newPasswordController.text;
-
-    if (_generatedOtp == null) {
-      setState(() => _errorMessage = "OTP expired. Please resend.");
-    } else if (enteredOtp != _generatedOtp) {
-      setState(() => _errorMessage = "Invalid OTP.");
-    } else if (newPassword.length < 6) {
-      setState(() => _errorMessage = "Password must be at least 6 characters.");
-    } else {
-      setState(() {
-        _errorMessage = null;
-        _otpVerified = true;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Password changed successfully.")),
-      );
-
-      Navigator.pop(context);
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Password reset email sent to $email")),
+        );
+        Navigator.pop(context);
+      }
+    } on FirebaseAuthException catch (e) {
+      String errorMessage = "Failed to send reset email.";
+      if (e.code == 'user-not-found') {
+        errorMessage = "No user found for this email.";
+      } else if (e.code == 'invalid-email') {
+        errorMessage = "Invalid email address.";
+      }
+      setState(() => _errorMessage = errorMessage);
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -111,11 +73,9 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> with Single
       body: Stack(
         children: [
           _buildBackground(),
-
           SafeArea(
             child: Column(
               children: [
-                // Back Button
                 Align(
                   alignment: Alignment.topLeft,
                   child: IconButton(
@@ -148,67 +108,39 @@ class _ForgetPasswordScreenState extends State<ForgetPasswordScreen> with Single
                             ),
                             const SizedBox(height: 16),
                             Text(
-                              "Enter your email, verify with OTP, and set a new password.",
+                              "Enter your email to receive a password reset link.",
                               style: GoogleFonts.poppins(fontSize: 16, color: Colors.white70),
                               textAlign: TextAlign.center,
                             ),
                             const SizedBox(height: 32),
-
                             TextField(
                               controller: _emailController,
-                              enabled: !_otpSent,
                               style: const TextStyle(color: Colors.white),
                               decoration: _buildInputDecoration("Email"),
                               keyboardType: TextInputType.emailAddress,
                             ),
                             const SizedBox(height: 16),
-
-                            if (_otpSent) ...[
-                              TextField(
-                                controller: _otpController,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: _buildInputDecoration("Enter OTP"),
-                                keyboardType: TextInputType.number,
-                              ),
-                              const SizedBox(height: 16),
-                              TextField(
-                                controller: _newPasswordController,
-                                style: const TextStyle(color: Colors.white),
-                                decoration: _buildInputDecoration("New Password"),
-                                obscureText: true,
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-
                             if (_errorMessage != null) ...[
                               Text(_errorMessage!, style: const TextStyle(color: Colors.redAccent)),
                               const SizedBox(height: 16),
                             ],
-
-                            if (_otpSent && _otpCountdown > 0)
-                              Text("OTP expires in $_otpCountdown seconds", style: const TextStyle(color: Colors.white70)),
-
                             const SizedBox(height: 24),
-
                             ElevatedButton.icon(
-                              onPressed: _otpSent ? _verifyOtpAndChangePassword : _sendOtp,
-                              icon: Icon(_otpSent ? Icons.check : Icons.send, color: Colors.black),
-                              label: Text(
-                                _otpSent ? "Verify & Change Password" : "Send OTP",
-                                style: const TextStyle(color: Colors.black),
-                              ),
+                              onPressed: _isLoading ? null : _sendPasswordResetEmail,
+                              icon: const Icon(Icons.send, color: Colors.black),
+                              label: _isLoading
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                                    )
+                                  : const Text("Send Reset Link", style: TextStyle(color: Colors.black)),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white,
                                 minimumSize: const Size(double.infinity, 50),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                               ),
                             ),
-
-                            if (_otpSent && _otpCountdown <= 0)
-                              TextButton(
-                                onPressed: _sendOtp,
-                                child: const Text("Resend OTP", style: TextStyle(color: Colors.cyanAccent)),
-                              ),
                           ],
                         ),
                       ),

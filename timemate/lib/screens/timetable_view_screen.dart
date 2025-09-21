@@ -1,220 +1,149 @@
-import 'package:flutter/material.dart';
-import 'period_details_popup.dart';
-import 'manual_extra_classes_screen.dart';
 
-import 'package:pdf/pdf.dart';
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'dart:convert';
 
-import 'package:excel/excel.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
 
 class TimetableViewScreen extends StatefulWidget {
-  final String year;
-  final Map<String, List<String>> timetable;
-
-  const TimetableViewScreen({
-    super.key,
-    required this.year,
-    required this.timetable,
-  });
+  const TimetableViewScreen({super.key});
 
   @override
   State<TimetableViewScreen> createState() => _TimetableViewScreenState();
 }
 
 class _TimetableViewScreenState extends State<TimetableViewScreen> {
-  bool isEditMode = false;
-  late Map<String, List<String>> timetable;
+  bool _isLoading = true;
+  List<List<Map<String, String>>> timetable = [];
+  int periodsPerDay = 9;
+  List<String> days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  String? pdfUrl;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   @override
   void initState() {
     super.initState();
-    timetable = Map.from(widget.timetable);
+    _fetchTimetable();
   }
 
-  void _toggleEdit() {
-    setState(() => isEditMode = !isEditMode);
-  }
-
-  Future<void> _exportPDF() async {
-    final pdf = pw.Document();
-    final days = timetable.keys.toList();
-    final periods = timetable[days.first]!.length;
-
-    pdf.addPage(
-      pw.Page(
-        build: (pw.Context context) => pw.Column(
-          children: [
-            pw.Text('${widget.year} Timetable',
-                style: pw.TextStyle(
-                    fontSize: 24, fontWeight: pw.FontWeight.bold)),
-            pw.SizedBox(height: 16),
-            pw.Table.fromTextArray(
-              headers: ['Day'] + List.generate(periods, (p) => 'P${p + 1}'),
-              data: days
-                  .map((day) => [
-                        day,
-                        ...timetable[day]!,
-                      ])
-                  .toList(),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    await Printing.layoutPdf(
-        onLayout: (PdfPageFormat format) async => pdf.save());
-  }
-
-  Future<void> _exportExcel() async {
-    final excel = Excel.createExcel();
-    final sheet = excel['Timetable'];
-    final days = timetable.keys.toList();
-    final periods = timetable[days.first]!.length;
-
-    // Write header
-    sheet.appendRow(['Day'] + List.generate(periods, (p) => 'P${p + 1}'));
-
-    // Write data
-    for (var day in days) {
-      sheet.appendRow([day, ...timetable[day]!]);
+  Future<void> _fetchTimetable() async {
+    setState(() => _isLoading = true);
+    final user = _auth.currentUser;
+    if (user != null) {
+      final doc = await _firestore.collection('users').doc(user.uid).collection('timetables').doc('main').get();
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        if (data['timetableData'] != null) {
+          final List decoded = jsonDecode(data['timetableData']);
+          timetable = decoded
+              .map<List<Map<String, String>>>((d) => (d as List)
+                  .map<Map<String, String>>((c) => Map<String, String>.from(c))
+                  .toList())
+              .toList();
+        }
+        if (data['pdfUrl'] != null) {
+          pdfUrl = data['pdfUrl'];
+        }
+      }
     }
-
-    final dir = await getExternalStorageDirectory();
-    final String path = '${dir!.path}/${widget.year}_Timetable.xlsx';
-    final bytes = excel.encode();
-    final file = File(path)
-      ..createSync(recursive: true)
-      ..writeAsBytesSync(bytes!);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Excel saved at: $path')),
-    );
+    setState(() => _isLoading = false);
   }
 
-  void _addExtraClass() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ManualExtraClassesScreen(year: widget.year),
-      ),
-    );
-  }
-
-  void _save() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Timetable saved!")),
-    );
+  Future<void> _downloadPDF() async {
+    if (pdfUrl != null) {
+      await Printing.layoutPdf(onLayout: (format) async {
+        final bytes = await _storage.refFromURL(pdfUrl!).getData();
+        return bytes!;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final days = timetable.keys.toList();
-    final periods = timetable[days.first]!.length;
-
     return Scaffold(
       appBar: AppBar(
-        title: Text("${widget.year} Timetable"),
+        title: const Text("Your Timetable"),
         actions: [
-          IconButton(
-            icon: Icon(isEditMode ? Icons.done : Icons.edit),
-            onPressed: _toggleEdit,
-            tooltip: isEditMode ? "Done Editing" : "Edit",
-          ),
-          IconButton(
-            icon: const Icon(Icons.picture_as_pdf),
-            onPressed: _exportPDF,
-            tooltip: "Export PDF",
-          ),
-          IconButton(
-            icon: const Icon(Icons.table_chart),
-            onPressed: _exportExcel,
-            tooltip: "Export Excel",
-          ),
+          if (pdfUrl != null)
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf),
+              onPressed: _downloadPDF,
+              tooltip: "Download PDF",
+            ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: DataTable(
-            columns: [
-              const DataColumn(label: Text("Day")),
-              for (int p = 1; p <= periods; p++) DataColumn(label: Text("P$p")),
-            ],
-            rows: days
-                .map((day) => DataRow(cells: [
-                      DataCell(Text(day)),
-                      ...List.generate(periods, (p) {
-                        final periodLabel = "P${p + 1}";
-                        final cellValue = timetable[day]![p];
-                        return DataCell(
-                          isEditMode
-                              ? DropdownButton<String>(
-                                  value: cellValue,
-                                  items: [
-                                    "Math",
-                                    "English",
-                                    "Physics",
-                                    "Chemistry",
-                                    "Biology",
-                                    "Free"
-                                  ]
-                                      .map((s) =>
-                                          DropdownMenuItem(value: s, child: Text(s)))
-                                      .toList(),
-                                  onChanged: (val) {
-                                    setState(() {
-                                      timetable[day]![p] =
-                                          val ?? timetable[day]![p];
-                                    });
-                                  },
-                                )
-                              : GestureDetector(
-                                  onTap: () async {
-                                    final result = await showDialog(
-                                      context: context,
-                                      builder: (_) => PeriodDetailsPopup(
-                                        day: day,
-                                        periodLabel: periodLabel,
-                                        initialSubject: cellValue,
-                                        initialStaff: "",
-                                        initialTiming: "",
-                                        initialLectures: 1,
-                                        initialTopic: "",
-                                        initialPlayHour: false,
-                                        isEditable: isEditMode,
-                                      ),
-                                    );
-                                    if (result != null) {
-                                      debugPrint("Period updated: $result");
-                                    }
-                                  },
-                                  child: Text(cellValue),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : timetable.isEmpty
+              ? const Center(child: Text("No timetable found."))
+              : Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Table(
+                      border: TableBorder.all(color: Colors.white54),
+                      defaultColumnWidth: const FixedColumnWidth(110),
+                      children: [
+                        TableRow(
+                          decoration: const BoxDecoration(color: Colors.cyanAccent),
+                          children: [
+                            const TableCell(
+                                child: Center(
+                                    child: Text("Day/Period",
+                                        style: TextStyle(fontWeight: FontWeight.bold)))),
+                            ...List.generate(periodsPerDay, (i) {
+                              return TableCell(
+                                child: Center(
+                                  child: Text("P${i + 1}",
+                                      style: const TextStyle(fontWeight: FontWeight.bold)),
                                 ),
-                        );
-                      }),
-                    ]))
-                .toList(),
-          ),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _addExtraClass,
-        label: const Text("Add Extra Class"),
-        icon: const Icon(Icons.add),
-      ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: ElevatedButton.icon(
-          onPressed: _save,
-          icon: const Icon(Icons.save),
-          label: const Text("Save"),
-        ),
-      ),
+                              );
+                            }),
+                          ],
+                        ),
+                        ...List.generate(timetable.length, (dayIndex) {
+                          return TableRow(
+                            decoration: BoxDecoration(
+                                color: dayIndex.isEven ? Colors.black26 : Colors.black12),
+                            children: [
+                              TableCell(
+                                child: Center(
+                                  child: Text(days[dayIndex],
+                                      style: const TextStyle(
+                                          color: Colors.white, fontWeight: FontWeight.bold)),
+                                ),
+                              ),
+                              ...List.generate(periodsPerDay, (periodIndex) {
+                                final subject = timetable[dayIndex][periodIndex]['subject'] ?? "";
+                                final staff = timetable[dayIndex][periodIndex]['staff'] ?? "";
+                                return TableCell(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    alignment: Alignment.center,
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(subject, style: const TextStyle(color: Colors.white)),
+                                        if (staff.isNotEmpty)
+                                          Text(staff, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ],
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ),
     );
   }
 }

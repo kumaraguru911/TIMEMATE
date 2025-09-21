@@ -4,7 +4,9 @@ import 'package:excel/excel.dart';
 import 'package:flutter/material.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class GenerateTimetableScreen extends StatefulWidget {
   final String year;
@@ -36,9 +38,12 @@ class _GenerateTimetableScreenState extends State<GenerateTimetableScreen> {
     6,
     (_) => List.generate(9, (_) => {"subject": "", "staff": ""}),
   );
-
   final List<String> days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   bool includeSaturday = true;
+  bool _isLoading = true;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   @override
   void initState() {
@@ -47,23 +52,23 @@ class _GenerateTimetableScreenState extends State<GenerateTimetableScreen> {
   }
 
   Future<void> _loadOrGenerate() async {
+    setState(() => _isLoading = true);
     final loaded = await _loadTimetable();
     if (!loaded) {
       _generateFromInputs();
       await _saveTimetable();
-      setState(() {});
-    } else {
-      setState(() {});
     }
+    setState(() => _isLoading = false);
   }
 
   Future<bool> _loadTimetable() async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = "timetable_${widget.year}_${widget.department}_${widget.section}";
-    final raw = prefs.getString(key);
-    if (raw == null) return false;
-
-    final List decoded = jsonDecode(raw);
+    final user = _auth.currentUser;
+    if (user == null) return false;
+    final doc = await _firestore.collection('users').doc(user.uid).collection('timetables').doc('main').get();
+    if (!doc.exists) return false;
+    final data = doc.data();
+    if (data == null || data['timetableData'] == null) return false;
+    final List decoded = jsonDecode(data['timetableData']);
     timetable = decoded
         .map<List<Map<String, String>>>((d) => (d as List)
             .map<Map<String, String>>((c) => Map<String, String>.from(c))
@@ -73,9 +78,13 @@ class _GenerateTimetableScreenState extends State<GenerateTimetableScreen> {
   }
 
   Future<void> _saveTimetable() async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = "timetable_${widget.year}_${widget.department}_${widget.section}";
-    await prefs.setString(key, jsonEncode(timetable));
+    final user = _auth.currentUser;
+    if (user == null) return;
+    final docRef = _firestore.collection('users').doc(user.uid).collection('timetables').doc('main');
+    await docRef.set({
+      'generatedOn': DateTime.now().toIso8601String(),
+      'timetableData': jsonEncode(timetable),
+    });
   }
 
   // ---------------- allocation ----------------
@@ -318,14 +327,23 @@ class _GenerateTimetableScreenState extends State<GenerateTimetableScreen> {
         },
       ),
     );
-    await Printing.sharePdf(
-        bytes: await pdf.save(), filename: "timetable.pdf");
+    final bytes = await pdf.save();
+    await Printing.sharePdf(bytes: bytes, filename: "timetable.pdf");
+    // Upload to Firebase Storage
+    final user = _auth.currentUser;
+    if (user != null) {
+      final ref = _storage.ref().child('users/${user.uid}/timetables/main.pdf');
+      await ref.putData(Uint8List.fromList(bytes));
+      final url = await ref.getDownloadURL();
+      await _firestore.collection('users').doc(user.uid).collection('timetables').doc('main').update({
+        'pdfUrl': url,
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final displayDays = includeSaturday ? days : days.sublist(0, 5);
-
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -350,144 +368,146 @@ class _GenerateTimetableScreenState extends State<GenerateTimetableScreen> {
           )
         ],
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-              colors: [Color(0xFF2B5876), Color(0xFF4E4376)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                Image.asset("assets/college_logo.png", height: 80),
-                const SizedBox(height: 10),
-                Text(
-                  "Year: ${widget.year}, Dept: ${widget.department}, Sec: ${widget.section.isEmpty ? 'N/A' : widget.section}",
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                Expanded(
-                  child: Card(
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                    color: Colors.white.withOpacity(0.1),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Table(
-                        border: TableBorder.all(color: Colors.white54),
-                        defaultColumnWidth: const FixedColumnWidth(110),
-                        children: [
-                          TableRow(
-                            decoration:
-                                const BoxDecoration(color: Colors.cyanAccent),
-                            children: [
-                              const TableCell(
-                                  child: Center(
-                                      child: Text("Day/Period",
-                                          style: TextStyle(
-                                              fontWeight: FontWeight.bold)))),
-                              ...List.generate(widget.periodsPerDay, (i) {
-                                return TableCell(
-                                  child: Center(
-                                    child: Text("P${i + 1}",
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold)),
-                                  ),
-                                );
-                              }),
-                            ],
-                          ),
-                          ...List.generate(displayDays.length, (dayIndex) {
-                            return TableRow(
-                              decoration: BoxDecoration(
-                                  color: dayIndex.isEven
-                                      ? Colors.black26
-                                      : Colors.black12),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                    colors: [Color(0xFF2B5876), Color(0xFF4E4376)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight),
+              ),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    children: [
+                      Image.asset("assets/college_logo.png", height: 80),
+                      const SizedBox(height: 10),
+                      Text(
+                        "Year: ${widget.year}, Dept: ${widget.department}, Sec: ${widget.section.isEmpty ? 'N/A' : widget.section}",
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 12),
+                      Expanded(
+                        child: Card(
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16)),
+                          color: Colors.white.withOpacity(0.1),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Table(
+                              border: TableBorder.all(color: Colors.white54),
+                              defaultColumnWidth: const FixedColumnWidth(110),
                               children: [
-                                TableCell(
-                                  child: Center(
-                                    child: Text(displayDays[dayIndex],
-                                        style: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold)),
-                                  ),
+                                TableRow(
+                                  decoration:
+                                      const BoxDecoration(color: Colors.cyanAccent),
+                                  children: [
+                                    const TableCell(
+                                        child: Center(
+                                            child: Text("Day/Period",
+                                                style: TextStyle(
+                                                    fontWeight: FontWeight.bold)))),
+                                    ...List.generate(widget.periodsPerDay, (i) {
+                                      return TableCell(
+                                        child: Center(
+                                          child: Text("P${i + 1}",
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.bold)),
+                                        ),
+                                      );
+                                    }),
+                                  ],
                                 ),
-                                ...List.generate(widget.periodsPerDay,
-                                    (periodIndex) {
-                                  final subject = timetable[dayIndex][periodIndex]
-                                          ['subject'] ??
-                                      "";
-                                  final staff = timetable[dayIndex][periodIndex]
-                                          ['staff'] ??
-                                      "";
-                                  return TableCell(
-                                    child: GestureDetector(
-                                      onTap: () =>
-                                          _showCellInfo(dayIndex, periodIndex),
-                                      onLongPress: () =>
-                                          _editCell(dayIndex, periodIndex),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(6),
-                                        alignment: Alignment.center,
-                                        color: _getCellColor(subject),
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Text(subject,
-                                                style: const TextStyle(
-                                                    color: Colors.white)),
-                                            if (staff.isNotEmpty)
-                                              Text(staff,
-                                                  style: const TextStyle(
-                                                      color: Colors.white70,
-                                                      fontSize: 12)),
-                                          ],
+                                ...List.generate(displayDays.length, (dayIndex) {
+                                  return TableRow(
+                                    decoration: BoxDecoration(
+                                        color: dayIndex.isEven
+                                            ? Colors.black26
+                                            : Colors.black12),
+                                    children: [
+                                      TableCell(
+                                        child: Center(
+                                          child: Text(displayDays[dayIndex],
+                                              style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold)),
                                         ),
                                       ),
-                                    ),
+                                      ...List.generate(widget.periodsPerDay,
+                                          (periodIndex) {
+                                        final subject = timetable[dayIndex][periodIndex]
+                                                ['subject'] ??
+                                            "";
+                                        final staff = timetable[dayIndex][periodIndex]
+                                                ['staff'] ??
+                                            "";
+                                        return TableCell(
+                                          child: GestureDetector(
+                                            onTap: () =>
+                                                _showCellInfo(dayIndex, periodIndex),
+                                            onLongPress: () =>
+                                                _editCell(dayIndex, periodIndex),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(6),
+                                              alignment: Alignment.center,
+                                              color: _getCellColor(subject),
+                                              child: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text(subject,
+                                                      style: const TextStyle(
+                                                          color: Colors.white)),
+                                                  if (staff.isNotEmpty)
+                                                    Text(staff,
+                                                        style: const TextStyle(
+                                                            color: Colors.white70,
+                                                            fontSize: 12)),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      }),
+                                    ],
                                   );
                                 }),
                               ],
-                            );
-                          }),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.picture_as_pdf),
+                            onPressed: _exportPDF,
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.cyanAccent,
+                                foregroundColor: Colors.black),
+                            label: const Text("Export PDF"),
+                          ),
+                          ElevatedButton.icon(
+                            icon: const Icon(Icons.table_chart),
+                            onPressed: _exportExcel,
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.cyanAccent,
+                                foregroundColor: Colors.black),
+                            label: const Text("Export Excel"),
+                          ),
                         ],
                       ),
-                    ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.picture_as_pdf),
-                      onPressed: _exportPDF,
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.cyanAccent,
-                          foregroundColor: Colors.black),
-                      label: const Text("Export PDF"),
-                    ),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.table_chart),
-                      onPressed: _exportExcel,
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.cyanAccent,
-                          foregroundColor: Colors.black),
-                      label: const Text("Export Excel"),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
-import 'package:shared_preferences/shared_preferences.dart'; // ✅ For saving email
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -29,6 +31,10 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
   String? _confirmPasswordError;
   String? _departmentError;
 
+  bool _isLoading = false;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   @override
   void initState() {
     super.initState();
@@ -51,7 +57,8 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
     super.dispose();
   }
 
-  void _handleRegister() async {
+  // ---------------- Handle Firebase Registration ----------------
+  Future<void> _handleRegister() async {
     setState(() {
       _nameError = _nameController.text.trim().isEmpty ? "Please enter your name" : null;
       _usernameError = _usernameController.text.trim().isEmpty ? "Please enter a username" : null;
@@ -71,16 +78,53 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         _passwordError == null &&
         _confirmPasswordError == null &&
         _departmentError == null) {
-      final username = _usernameController.text.trim();
-      final email = _emailController.text.trim(); // ✅
+      try {
+        setState(() => _isLoading = true);
 
-      await saveUsername(username);
-      await saveEmail(email); // ✅
+        // Create user in Firebase Auth
+        final userCredential = await _auth.createUserWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Registered successfully!")),
-      );
-      Navigator.pop(context);
+        // Optionally update display name in Firebase
+        await _auth.currentUser?.updateDisplayName(_nameController.text.trim());
+
+        // Save user profile to Firestore
+        final user = userCredential.user;
+        if (user != null) {
+          await _firestore.collection('users').doc(user.uid).set({
+            'uid': user.uid,
+            'name': _nameController.text.trim(),
+            'username': _usernameController.text.trim(),
+            'email': _emailController.text.trim(),
+            'department': _selectedDepartment,
+            'profilePic': '', // Default empty, can be updated later
+          });
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Registered successfully!")),
+        );
+
+        if (mounted) Navigator.pushReplacementNamed(context, '/dashboard');
+      } on FirebaseAuthException catch (e) {
+        String errorMessage = "Registration failed. Please try again.";
+        if (e.code == 'email-already-in-use') {
+          errorMessage = "This email is already registered.";
+        } else if (e.code == 'invalid-email') {
+          errorMessage = "Invalid email address.";
+        } else if (e.code == 'weak-password') {
+          errorMessage = "Password is too weak.";
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorMessage)),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -89,6 +133,7 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
     return Scaffold(
       body: Stack(
         children: [
+          // Gradient background
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -107,119 +152,84 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
                 scale: _animation,
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: IconButton(
-                            icon: const Icon(Icons.arrow_back, color: Colors.white),
-                            onPressed: () {
-                              Navigator.pop(context);
-                            },
-                          ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: IconButton(
+                          icon: const Icon(Icons.arrow_back, color: Colors.white),
+                          onPressed: () => Navigator.pop(context),
                         ),
-                        SizedBox(
-                          height: 180,
-                          child: Lottie.asset(
-                            'assets/animations/login.json',
-                            fit: BoxFit.contain,
-                            repeat: true,
-                          ),
+                      ),
+                      SizedBox(
+                        height: 180,
+                        child: Lottie.asset(
+                          'assets/animations/login.json',
+                          fit: BoxFit.contain,
+                          repeat: true,
                         ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          "Register",
-                          style: TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 1.2,
-                          ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        "Register",
+                        style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.2),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        "Create your account to start planning!",
+                        style: TextStyle(fontSize: 16, color: Colors.white70),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 32),
+                      _buildTextField(_nameController, "Name", _nameError),
+                      const SizedBox(height: 16),
+                      _buildTextField(_usernameController, "Username", _usernameError),
+                      const SizedBox(height: 16),
+                      _buildTextField(_emailController, "Email", _emailError),
+                      const SizedBox(height: 16),
+                      _buildTextField(_passwordController, "Password", _passwordError, obscureText: true),
+                      const SizedBox(height: 16),
+                      _buildTextField(_confirmPasswordController, "Confirm Password", _confirmPasswordError, obscureText: true),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        dropdownColor: const Color(0xFF1A1A2E),
+                        value: _selectedDepartment,
+                        decoration: _buildInputDecoration("Department", _departmentError),
+                        iconEnabledColor: Colors.white70,
+                        style: const TextStyle(color: Colors.white),
+                        items: const [
+                          DropdownMenuItem(value: "AI & DS", child: Text("AI & DS")),
+                          DropdownMenuItem(value: "CSE", child: Text("CSE")),
+                          DropdownMenuItem(value: "ECE", child: Text("ECE")),
+                          DropdownMenuItem(value: "EEE", child: Text("EEE")),
+                          DropdownMenuItem(value: "IT", child: Text("IT")),
+                          DropdownMenuItem(value: "MECH", child: Text("MECH")),
+                          DropdownMenuItem(value: "CIVIL", child: Text("CIVIL")),
+                        ],
+                        onChanged: (value) => setState(() => _selectedDepartment = value),
+                      ),
+                      const SizedBox(height: 32),
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : _handleRegister,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 50),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                         ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          "Create your account to start planning!",
-                          style: TextStyle(fontSize: 16, color: Colors.white70),
-                          textAlign: TextAlign.center,
+                        child: _isLoading
+                            ? const CircularProgressIndicator(color: Colors.black)
+                            : const Text("Register", style: TextStyle(color: Colors.black, fontSize: 18)),
+                      ),
+                      const SizedBox(height: 20),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: const Text(
+                          "Already have an account? Login",
+                          style: TextStyle(color: Colors.cyanAccent, decoration: TextDecoration.none),
                         ),
-                        const SizedBox(height: 32),
-                        TextFormField(
-                          controller: _nameController,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: _buildInputDecoration("Name", _nameError),
-                          cursorColor: Colors.white,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _usernameController,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: _buildInputDecoration("Username", _usernameError),
-                          cursorColor: Colors.white,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _emailController,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: _buildInputDecoration("Email", _emailError),
-                          cursorColor: Colors.white,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _passwordController,
-                          obscureText: true,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: _buildInputDecoration("Password", _passwordError),
-                          cursorColor: Colors.white,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _confirmPasswordController,
-                          obscureText: true,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: _buildInputDecoration("Confirm Password", _confirmPasswordError),
-                          cursorColor: Colors.white,
-                        ),
-                        const SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
-                          dropdownColor: const Color(0xFF1A1A2E),
-                          value: _selectedDepartment,
-                          decoration: _buildInputDecoration("Department", _departmentError),
-                          iconEnabledColor: Colors.white70,
-                          style: const TextStyle(color: Colors.white),
-                          items: const [
-                            DropdownMenuItem(value: "AI & DS", child: Text("AI & DS")),
-                            DropdownMenuItem(value: "CSE", child: Text("CSE")),
-                            DropdownMenuItem(value: "ECE", child: Text("ECE")),
-                            DropdownMenuItem(value: "EEE", child: Text("EEE")),
-                            DropdownMenuItem(value: "IT", child: Text("IT")),
-                            DropdownMenuItem(value: "MECH", child: Text("MECH")),
-                            DropdownMenuItem(value: "CIVIL", child: Text("CIVIL")),
-                          ],
-                          onChanged: (value) => setState(() => _selectedDepartment = value),
-                        ),
-                        const SizedBox(height: 32),
-                        ElevatedButton(
-                          onPressed: _handleRegister,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            minimumSize: const Size(double.infinity, 50),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                          ),
-                          child: const Text("Register", style: TextStyle(color: Colors.black, fontSize: 18)),
-                        ),
-                        const SizedBox(height: 20),
-                        GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: const Text(
-                            "Already have an account? Login",
-                            style: TextStyle(color: Colors.cyanAccent, decoration: TextDecoration.none),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -234,6 +244,16 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         width: size,
         height: size,
         decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+      );
+
+  Widget _buildTextField(TextEditingController controller, String label, String? errorText,
+          {bool obscureText = false}) =>
+      TextFormField(
+        controller: controller,
+        obscureText: obscureText,
+        style: const TextStyle(color: Colors.white),
+        decoration: _buildInputDecoration(label, errorText),
+        cursorColor: Colors.white,
       );
 
   InputDecoration _buildInputDecoration(String label, String? errorText) => InputDecoration(
@@ -260,22 +280,3 @@ class _RegisterScreenState extends State<RegisterScreen> with SingleTickerProvid
         fillColor: Colors.white.withOpacity(0.1),
       );
 }
-
-// ✅ Helper to save username
-Future<void> saveUsername(String username) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString('username', username);
-}
-
-// ✅ Helper to save email
-Future<void> saveEmail(String email) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setString('email', email);
-}
-// This code defines a Register screen with user registration functionality.
-// It includes fields for name, username, email, password, confirm password, and department selection.
-// The screen uses a form with validation, and upon successful registration, it saves the username and email using SharedPreferences.
-// The UI features a gradient background, decorative circles, and an animated Lottie asset for visual appeal.
-// The registration button triggers validation and saves the data, while a link allows users to navigate back to the login screen if they already have an account.
-// The screen is designed to be user-friendly and visually appealing, with a focus on simplicity and ease of use.
-// The use of Lottie animations enhances the user experience, making the registration process more engaging.

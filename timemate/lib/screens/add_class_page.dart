@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AddClassPage extends StatefulWidget {
   const AddClassPage({super.key});
@@ -20,6 +22,9 @@ class _ClassRowControllers {
 }
 
 class _AddClassPageState extends State<AddClassPage> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  bool _isLoading = false;
   final _formKey = GlobalKey<FormState>();
   String _selectedDay = 'Monday';
   final List<_ClassRowControllers> _controllers = [_ClassRowControllers()];
@@ -35,130 +40,129 @@ class _AddClassPageState extends State<AddClassPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Day\'s Schedule')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            children: [
-              DropdownButtonFormField<String>(
-                value: _selectedDay,
-                items: const [
-                  DropdownMenuItem(value: 'Monday', child: Text('Monday')),
-                  DropdownMenuItem(value: 'Tuesday', child: Text('Tuesday')),
-                  DropdownMenuItem(
-                    value: 'Wednesday',
-                    child: Text('Wednesday'),
-                  ),
-                  DropdownMenuItem(value: 'Thursday', child: Text('Thursday')),
-                  DropdownMenuItem(value: 'Friday', child: Text('Friday')),
-                  DropdownMenuItem(value: 'Saturday', child: Text('Saturday')),
-                ],
-                onChanged: (value) => setState(() => _selectedDay = value!),
-                decoration: const InputDecoration(labelText: 'Day'),
-              ),
-              const SizedBox(height: 16),
-              ..._controllers.asMap().entries.map((entry) {
-                final index = entry.key;
-                final c = entry.value;
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: c.subjectController,
-                          decoration: InputDecoration(
-                            labelText: 'Subject ${index + 1}',
-                          ),
-                          validator:
-                              (value) =>
-                                  value!.isEmpty ? 'Enter subject' : null,
-                        ),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: c.startTimeController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Start Time',
-                                ),
-                                validator:
-                                    (value) =>
-                                        value!.isEmpty
-                                            ? 'Enter start time'
-                                            : null,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: TextFormField(
-                                controller: c.endTimeController,
-                                decoration: const InputDecoration(
-                                  labelText: 'End Time',
-                                ),
-                                validator:
-                                    (value) =>
-                                        value!.isEmpty
-                                            ? 'Enter end time'
-                                            : null,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () {
-                              setState(() {
-                                _controllers.removeAt(index).dispose();
-                              });
-                            },
-                          ),
-                        ),
+      appBar: AppBar(title: const Text("Add Day's Schedule")),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16),
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: _selectedDay,
+                      items: const [
+                        DropdownMenuItem(value: 'Monday', child: Text('Monday')),
+                        DropdownMenuItem(value: 'Tuesday', child: Text('Tuesday')),
+                        DropdownMenuItem(value: 'Wednesday', child: Text('Wednesday')),
+                        DropdownMenuItem(value: 'Thursday', child: Text('Thursday')),
+                        DropdownMenuItem(value: 'Friday', child: Text('Friday')),
+                        DropdownMenuItem(value: 'Saturday', child: Text('Saturday')),
                       ],
+                      onChanged: (value) => setState(() => _selectedDay = value!),
+                      decoration: const InputDecoration(labelText: 'Day'),
                     ),
-                  ),
-                );
-              }),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.add),
-                label: const Text('Add Another Class'),
-                onPressed: () {
-                  setState(() {
-                    _controllers.add(_ClassRowControllers());
-                  });
-                },
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    final result =
-                        _controllers
-                            .map(
-                              (c) => {
+                    const SizedBox(height: 16),
+                    ..._controllers.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final c = entry.value;
+                      return Card(
+                        margin: const EdgeInsets.symmetric(vertical: 8),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            children: [
+                              TextFormField(
+                                controller: c.subjectController,
+                                decoration: InputDecoration(
+                                  labelText: 'Subject ${index + 1}',
+                                ),
+                                validator: (value) => value!.isEmpty ? 'Enter subject' : null,
+                              ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: c.startTimeController,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Start Time',
+                                      ),
+                                      validator: (value) => value!.isEmpty ? 'Enter start time' : null,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: c.endTimeController,
+                                      decoration: const InputDecoration(
+                                        labelText: 'End Time',
+                                      ),
+                                      validator: (value) => value!.isEmpty ? 'Enter end time' : null,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () {
+                                    setState(() {
+                                      _controllers.removeAt(index).dispose();
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Another Class'),
+                      onPressed: () {
+                        setState(() {
+                          _controllers.add(_ClassRowControllers());
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () async {
+                        if (_formKey.currentState!.validate()) {
+                          setState(() => _isLoading = true);
+                          final user = _auth.currentUser;
+                          if (user != null) {
+                            final classesRef = _firestore.collection('users').doc(user.uid).collection('classes');
+                            // Optionally, clear previous classes for this day
+                            final prev = await classesRef.where('day', isEqualTo: _selectedDay).get();
+                            for (var doc in prev.docs) {
+                              await doc.reference.delete();
+                            }
+                            // Add new classes
+                            for (final c in _controllers) {
+                              await classesRef.add({
                                 'day': _selectedDay,
                                 'subject': c.subjectController.text,
                                 'startTime': c.startTimeController.text,
                                 'endTime': c.endTimeController.text,
-                              },
-                            )
-                            .toList();
-                    Navigator.of(
-                      context,
-                    ).pop(result); // ✅ Correctly return data
-                  }
-                },
-                child: const Text('Save Schedule'),
+                              });
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Classes saved to Firestore!')),
+                            );
+                          }
+                          setState(() => _isLoading = false);
+                          Navigator.of(context).pop();
+                        }
+                      },
+                      child: const Text('Save Schedule'),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 }
