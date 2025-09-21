@@ -1,87 +1,77 @@
-# TIMEMATE
-=========================================
-# TimeMate - College Timetable App
 
-A beautiful Flutter app to plan and organize college timetables, featuring multiple class inputs, grouping by day, animations, persistent storage, and more.
+# TimeMate - College Timetable & Productivity App
 
-## Features
+TimeMate is a beautiful, modern Flutter app to plan, organize, and manage your college life. It features a dynamic dashboard, Firebase integration, animated UI, and powerful productivity tools for students and teachers.
 
-- Add, view, and organize multiple classes
-- Classes grouped by day for easy viewing
-- Animated class list for a modern UI experience
-- Persistent storage using Shared Preferences
-- Custom fonts with Google Fonts
-- Custom launcher icon
-- Asset image support
-- Gradient backgrounds and modern transitions
-- Animated page transitions and card opening (OpenContainer)
-- Lottie animation for empty state
+---
 
-## Getting Started
+## 🚀 Features
+
+- **Firebase Integration**: Secure login, registration, and data sync using Firebase Auth, Firestore, and Storage
+- **Dynamic Dashboard**: All-in-one dashboard with:
+  - Navigable calendar (month view, event highlights)
+  - Quick stats (classes, subjects, events, attendance)
+  - Announcements (from Firestore)
+  - Motivational quotes (from Firestore)
+  - Profile summary and next class info
+  - Timetable completion progress
+- **Sidebar Navigation**: Animated sidebar with Profile and Settings (Lottie icons)
+- **Lottie Animations**: Modern, smooth UI/UX throughout the app
+- **Responsive Design**: Works on all screen sizes
+- **Persistent Storage**: All data synced with Firestore
+- **Custom Theming**: Gradient backgrounds, custom fonts, and beautiful cards
+- **Easy Timetable Creation**: Add, edit, and view your timetable with a few taps
+- **Staff Database**: View staff info (for teachers/admins)
+
+---
+
+## 🛠️ Getting Started
 
 ### 1. Clone the repository
-```
+```sh
 git clone https://github.com/kumaraguru911/TIMEMATE
-cd class_timetable_app/class_timetable_app
+cd TIMEMATE/timemate
 ```
 
 ### 2. Install dependencies
-```
+```sh
 flutter pub get
 ```
 
-This will install all required packages, including:
-- animations
-- lottie
-
-### 3. Add your images
-Place your images in the `assets/` folder. Register them in `pubspec.yaml` under the `assets:` section:
-```yaml
-flutter:
-  assets:
-    - assets/your_image.png
-```
+### 3. Configure Firebase
+- Add your `google-services.json` (Android) and `GoogleService-Info.plist` (iOS) to the appropriate folders.
+- Make sure your Firebase project is set up for Auth, Firestore, and Storage.
 
 ### 4. Run the app
 Connect your device or start an emulator, then run:
-```
+```sh
 flutter run
 ```
-
 Or press **F5** in VS Code.
 
-### 5. Custom Launcher Icon
-This app uses `flutter_launcher_icons` for a custom app icon. To regenerate icons after changing the image, run:
-```
-flutter pub run flutter_launcher_icons:main
-```
+---
 
-------------------------
+## 📱 Screenshots
 
-## 📌 Conclusion
+<p align="center">
+  <img src="docs/dashboard.png" width="300" />
+  <img src="docs/calendar.png" width="300" />
+</p>
 
-Thank you for checking out **TimeMate**, your companion for efficient class scheduling and time management. This app is designed to help students and teachers easily create, edit, and organize their timetables with a user-friendly interface.
+---
 
-If you have any questions, suggestions, or would like to contribute, feel free to open an issue or submit a pull request. Your feedback is always welcome!
+## 🤝 Contributing
 
--------------------------
+Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
 
-## 🚀 Download the App
-
-You can download the latest version of the APK [here](https://drive.google.com/file/d/1YSlr83QMWGX70CsJzmZiiIARZ2ENnOq7/view?usp=sharing) — install it on your Android device and start managing your time better today!
-
---------------------------
+---
 
 ## 📄 License
 
 This project is open-source under the [MIT License](LICENSE).
 
----------------------------
+---
 
 Made with ❤️ by Kumaraguru
 
-
--------------------------------------------------------------------------
-
 For more information, see the [Flutter documentation](https://docs.flutter.dev/).
-e627169 (Initial commit: TimeMate app with enhanced UI and features)
